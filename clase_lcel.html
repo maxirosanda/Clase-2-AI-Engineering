@@ -153,6 +153,13 @@ html,body{transition:background .3s,color .3s}
 
   @media (max-width:1100px){nav{display:none}}
   @media print{.fit{zoom:1!important;width:100%!important}}
+
+  /* ===== Diapositiva con código largo: scroll interno en vez de achicar ===== */
+  .slide.scroll .fit{height:100%;justify-content:flex-start}
+  .slide.scroll .grid{flex:1;min-height:0}
+  .slide.scroll .card{display:flex;flex-direction:column;min-height:0}
+  .slide.scroll .card pre{flex:1;min-height:0;overflow:auto;font-size:clamp(.78rem,1.15vw,1rem)}
+  @media print{.slide.scroll .card pre{overflow:visible}}
 </style>
 <script>try{var t=localStorage.getItem('lcel-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 </head>
@@ -196,9 +203,9 @@ html,body{transition:background .3s,color .3s}
   <ul>
     <li>Los 3 componentes de una cadena y el operador <code>|</code></li>
     <li>Qué es un <code>Runnable</code> y los métodos que trae</li>
-    <li>Input shaping con diccionarios, lambdas y <code>RunnablePassthrough</code></li>
+    <li>Input shaping con diccionarios y lambdas</li>
     <li>Paralelismo: <code>RunnableParallel</code> y <code>batch</code></li>
-    <li>Hilos vs <code>asyncio</code>, sync vs async</li>
+    <li><code>batch</code> vs <code>abatch</code>, sync vs async</li>
     <li>Programación declarativa y errores comunes</li>
     <li>Salidas estructuradas con Pydantic y <code>with_structured_output</code></li>
     <li>Resiliencia: reintentos, backoff y fallbacks</li>
@@ -334,25 +341,6 @@ map_chain.invoke({<span class="s">"topic"</span>: <span class="s">"gatos"</span>
 
 <!-- 10 -->
 <section class="slide">
-  <h2>RunnablePassthrough</h2>
-  <p>Un runnable que <b>deja pasar la entrada sin modificarla</b> (como <code>lambda x: x</code>).</p>
-<pre><span class="c"># Pasar la entrada tal cual a una clave</span>
-{ <span class="s">"context"</span>: <span class="k">lambda</span> x: buscar(x), <span class="s">"question"</span>: RunnablePassthrough() }
-
-<span class="c"># assign: conserva el dict y le AGREGA claves</span>
-RunnablePassthrough.assign(
-    context=<span class="k">lambda</span> x: <span class="s">"Información sobre "</span> + x[<span class="s">"topic"</span>])
-<span class="c"># {"topic": ..., "question": ..., "context": ...}</span></pre>
-  <table>
-    <tr><th>Quiero...</th><th>Uso</th></tr>
-    <tr><td>Pasar la entrada sin tocarla</td><td>RunnablePassthrough()</td></tr>
-    <tr><td>Sacar una clave de un dict</td><td>lambda x: x["clave"]</td></tr>
-    <tr><td>Conservar el dict y agregar claves</td><td>RunnablePassthrough.assign(...)</td></tr>
-  </table>
-</section>
-
-<!-- 11 -->
-<section class="slide">
   <h2>RunnableParallel</h2>
   <p>Ejecuta varias cadenas <b>al mismo tiempo</b>, con la <b>misma entrada</b>, y devuelve un dict.</p>
 <pre>chain_tecnica    = prompt_tecnico    | model | parser
@@ -369,15 +357,19 @@ resultado = analisis_total.invoke({<span class="s">"idea"</span>: <span class="s
   </div>
 </section>
 
-<!-- 12 -->
+<!-- 11 -->
 <section class="slide">
   <h2>El diccionario es un RunnableParallel</h2>
-  <div class="grid">
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr">
     <div class="card ok">
-      <span class="tag ok">funciona</span>
-<pre>RunnableParallel(a=x, b=y)
-
-{<span class="s">"a"</span>: x, <span class="s">"b"</span>: y} | otro_paso</pre>
+      <span class="tag ok">funciona · forma 1</span>
+<pre>RunnableParallel(a=x, b=y)</pre>
+      <p style="font-size:clamp(.8rem,1.3vw,1.05rem)">Explícito: se puede usar solo.</p>
+    </div>
+    <div class="card ok">
+      <span class="tag ok">funciona · forma 2</span>
+<pre>{<span class="s">"a"</span>: x, <span class="s">"b"</span>: y} | otro_paso</pre>
+      <p style="font-size:clamp(.8rem,1.3vw,1.05rem)">Implícito: el dict unido con <code>|</code>.</p>
     </div>
     <div class="card bad">
       <span class="tag bad">error</span>
@@ -389,7 +381,7 @@ d.invoke(...)
   <p>El dict solo se convierte en <code>RunnableParallel</code> cuando está unido con <code>|</code> a otro runnable. Si querés usarlo solo, el truco es <code>{...} | RunnablePassthrough()</code>, pero <code>RunnableParallel(...)</code> es más claro.</p>
 </section>
 
-<!-- 13 -->
+<!-- 12 -->
 <section class="slide">
   <h2>batch vs RunnableParallel</h2>
   <table>
@@ -405,7 +397,7 @@ results = chain.batch(inputs, config={<span class="s">"max_concurrency"</span>: 
   <p><code>max_concurrency</code> limita cuántas se procesan a la vez para evitar rate limits de la API.</p>
 </section>
 
-<!-- 14 -->
+<!-- 13 -->
 <section class="slide">
   <h2>batch vs abatch</h2>
   <div class="grid">
@@ -421,60 +413,7 @@ results = chain.batch(inputs, config={<span class="s">"max_concurrency"</span>: 
   <p class="note">Ambos corren en paralelo y, para llamadas a una API, tardan casi lo mismo. La ventaja de <code>abatch</code> es integrarse con código async (<code>batch</code> bloquearía el servidor), no la velocidad.</p>
 </section>
 
-<!-- 15 -->
-<section class="slide">
-  <h2>Hilos: ¿qué son y por qué sirven?</h2>
-  <ul>
-    <li>Un <b>hilo</b> es una línea de ejecución dentro del programa. Varios hilos avanzan "a la vez".</li>
-    <li>Casi todo el tiempo de una llamada a la API es <b>esperar la red</b>, no usar CPU.</li>
-    <li>Mientras un hilo espera, los otros avanzan: las esperas se <b>superponen</b>, incluso con un solo núcleo.</li>
-    <li>El <b>GIL</b> impide que dos hilos ejecuten código Python a la vez: no sirven para cálculo pesado (ahí va <code>multiprocessing</code>).</li>
-  </ul>
-  <table>
-    <tr><th>Tipo de tarea</th><th>¿Ayudan los hilos?</th></tr>
-    <tr><td>Esperar red / API</td><td>Sí</td></tr>
-    <tr><td>Cálculo pesado de CPU</td><td>No (multiprocessing)</td></tr>
-  </table>
-</section>
-
-<!-- 16 -->
-<section class="slide">
-  <h2>Hilos en Python puro</h2>
-<pre><span class="k">from</span> concurrent.futures <span class="k">import</span> ThreadPoolExecutor
-<span class="k">import</span> time
-
-<span class="k">def</span> <span class="f">tarea</span>(n):
-    time.sleep(2)          <span class="c"># simula esperar una API</span>
-    <span class="k">return</span> n * 10
-
-<span class="k">with</span> ThreadPoolExecutor(max_workers=5) <span class="k">as</span> pool:
-    resultados = list(pool.map(tarea, [1, 2, 3, 4, 5]))
-
-print(resultados)          <span class="c"># [10, 20, 30, 40, 50] en ~2 s, no 10 s</span></pre>
-  <table>
-    <tr><th>Python puro</th><th>LangChain</th></tr>
-    <tr><td>ThreadPoolExecutor(max_workers=5)</td><td>config={"max_concurrency": 5}</td></tr>
-    <tr><td>pool.map(tarea, entradas)</td><td>chain.batch(entradas)</td></tr>
-  </table>
-</section>
-
-<!-- 17 -->
-<section class="slide">
-  <h2>¿Y en JavaScript?</h2>
-  <p>JS corre en <b>un solo hilo</b> con un event loop: se parece más a <code>asyncio</code> que a los hilos.</p>
-<pre><span class="k">const</span> resultados = <span class="k">await</span> Promise.all(
-  inputs.map((input) => chain.invoke(input)));
-
-<span class="c">// o con LangChain.js (batch ya es asíncrono)</span>
-<span class="k">const</span> resultados = <span class="k">await</span> chain.batch(inputs, { maxConcurrency: 5 });</pre>
-  <table>
-    <tr><th>Python</th><th>JavaScript</th></tr>
-    <tr><td>asyncio.gather(...)</td><td>Promise.all([...])</td></tr>
-    <tr><td>threading</td><td>worker_threads / Web Workers</td></tr>
-  </table>
-</section>
-
-<!-- 18 -->
+<!-- 14 -->
 <section class="slide">
   <h2>Declarativo vs imperativo</h2>
   <p class="big">Declarativo: el código describe el <b>qué</b> (el flujo), no el <b>cómo</b> (hilos y estados).</p>
@@ -498,7 +437,7 @@ chain.batch(inputs)</pre>
   <p>Analogía: pedir "una pizza de muzzarella" vs explicar cada paso de la cocina. Otro ejemplo: SQL.</p>
 </section>
 
-<!-- 19 -->
+<!-- 15 -->
 <section class="slide">
   <h2>Error 1: mismatch de tipos</h2>
   <div class="grid">
@@ -522,7 +461,7 @@ chain.invoke(<span class="s">"gatos"</span>)</pre>
   </table>
 </section>
 
-<!-- 20 -->
+<!-- 16 -->
 <section class="slide">
   <h2>Error 2: ignorar el output parser</h2>
   <div class="grid">
@@ -544,23 +483,64 @@ r.upper()  <span class="c"># "HOLA"</span></pre>
   <p>Terminá tus cadenas de texto con <code>StrOutputParser()</code> para que el resto de la app reciba un <code>str</code> estándar. Solo omitilo si necesitás la metadata (tokens, etc.).</p>
 </section>
 
-<!-- 21 -->
+<!-- 17 -->
 <section class="slide">
   <h2>Ejercicio 1: reseñas (paralelo → síntesis)</h2>
-<pre>sentiment_chain = (
+  <div class="grid" style="gap:1.2vw;align-items:stretch">
+    <div class="card" style="padding:1vh .8vw"><span class="tag">Parte 1 de 2 · cadenas y paralelo</span>
+<pre><span class="k">from</span> langchain_openai <span class="k">import</span> ChatOpenAI
+<span class="k">from</span> langchain_core.prompts <span class="k">import</span> ChatPromptTemplate
+<span class="k">from</span> langchain_core.output_parsers <span class="k">import</span> StrOutputParser
+<span class="k">from</span> langchain_core.runnables <span class="k">import</span> RunnableParallel
+
+model  = ChatOpenAI(model=<span class="s">"gpt-4o"</span>)  <span class="c"># el LLM</span>
+parser = StrOutputParser()  <span class="c"># convierte la respuesta en str</span>
+
+<span class="c"># Datos de entrada: una lista de reseñas (str)</span>
+reviews = [<span class="s">"Llegó rápido y funciona perfecto"</span>,
+           <span class="s">"Se rompió a la semana, pésima calidad"</span>,
+           <span class="s">"El envío tardó, pero el producto está bien"</span>]
+
+<span class="c"># Cadena 1: clasifica el sentimiento de una reseña</span>
+sentiment_chain = (
     ChatPromptTemplate.from_template(<span class="s">"...sentimiento...: {review}"</span>) | model | parser)
+<span class="c"># Cadena 2: extrae el tema principal de la misma reseña</span>
 topic_chain = (
     ChatPromptTemplate.from_template(<span class="s">"...tema principal...: {review}"</span>) | model | parser)
 
+<span class="c"># Paso paralelo: ambas cadenas reciben la MISMA</span>
+<span class="c"># reseña y corren a la vez.</span>
+<span class="c"># Devuelve un dict: {"sentiment": ..., "topic": ...}</span>
 analysis = RunnableParallel(sentiment=sentiment_chain, topic=topic_chain)
 
+<span class="c"># ... sigue en el cuadro de al lado →</span></pre>
+    </div>
+    <div class="card" style="padding:1vh .8vw"><span class="tag">Parte 2 de 2 · síntesis y batch</span>
+<pre><span class="c"># ← viene del cuadro anterior</span>
+<span class="c"># Prompt final: {sentiment} y {topic} coinciden</span>
+<span class="c"># con las claves del dict anterior</span>
 ticket_prompt = ChatPromptTemplate.from_template(
     <span class="s">"Sentimiento: {sentiment}\nTema: {topic}\nEscribí una línea de ticket..."</span>)
 
+<span class="c"># Cadena completa: reseña → (sentimiento ∥ tema)</span>
+<span class="c"># → prompt → modelo → texto</span>
 full_chain = analysis | ticket_prompt | model | parser
 
-tickets = full_chain.<span class="f">batch</span>(
-    [{<span class="s">"review"</span>: r} <span class="k">for</span> r <span class="k">in</span> reviews], config={<span class="s">"max_concurrency"</span>: 5})</pre>
+<span class="c"># batch recibe una LISTA de entradas y ejecuta</span>
+<span class="c"># full_chain una vez por cada una, en paralelo.</span>
+<span class="c"># Cada entrada es un dict con la clave "review"</span>
+<span class="c"># (la variable que esperan las cadenas 1 y 2).</span>
+inputs = [{<span class="s">"review"</span>: r} <span class="k">for</span> r <span class="k">in</span> reviews]
+
+<span class="c"># max_concurrency=5: máximo 5 cadenas a la vez</span>
+<span class="c"># (evita rate limits de la API)</span>
+tickets = full_chain.<span class="f">batch</span>(inputs, config={<span class="s">"max_concurrency"</span>: 5})
+
+<span class="c"># El resultado conserva el orden: tickets[i] corresponde a reviews[i]</span>
+<span class="k">for</span> r, t <span class="k">in</span> zip(reviews, tickets):
+    print(f<span class="s">"{r}  →  {t}"</span>)</pre>
+    </div>
+  </div>
   <div class="flow">
     <div class="node">review</div><span class="arrow">→</span>
     <div class="node m">sentimiento ∥ tema</div><span class="arrow">→</span>
@@ -570,22 +550,59 @@ tickets = full_chain.<span class="f">batch</span>(
   <p>Regla clave: las <b>claves del dict</b> que sale de un paso deben coincidir con las <b>variables del prompt</b> siguiente. Son 3 llamadas al modelo por reseña.</p>
 </section>
 
-<!-- 22 -->
+<!-- 18 -->
 <section class="slide">
   <h2>Ejercicio 2: cadena secuencial con lambda</h2>
-<pre>descripcion_chain = (
-    ChatPromptTemplate.from_template(<span class="s">"Descripción de 2 oraciones para: {producto}"</span>)
+  <div class="grid" style="gap:1.2vw;align-items:stretch">
+    <div class="card" style="padding:1vh .8vw"><span class="tag">Parte 1 de 2 · los dos pasos</span>
+<pre><span class="k">from</span> langchain_openai <span class="k">import</span> ChatOpenAI
+<span class="k">from</span> langchain_core.prompts <span class="k">import</span> ChatPromptTemplate
+<span class="k">from</span> langchain_core.output_parsers <span class="k">import</span> StrOutputParser
+
+model  = ChatOpenAI(model=<span class="s">"gpt-4o"</span>)  <span class="c"># el LLM</span>
+parser = StrOutputParser()  <span class="c"># convierte la respuesta en str</span>
+
+<span class="c"># Paso 1: recibe {producto} y devuelve una descripción (str)</span>
+descripcion_chain = (
+    ChatPromptTemplate.from_template(
+        <span class="s">"Descripción de 2 oraciones para: {producto}"</span>)
     | model | parser)
+
+<span class="c"># Paso 2: recibe {descripcion} y devuelve un tweet (str)</span>
 tweet_chain = (
-    ChatPromptTemplate.from_template(<span class="s">"Resumí en un tweet con 1 emoji: {descripcion}"</span>)
+    ChatPromptTemplate.from_template(
+        <span class="s">"Resumí en un tweet con 1 emoji: {descripcion}"</span>)
     | model | parser)
 
-full_chain = descripcion_chain | (<span class="k">lambda</span> desc: {<span class="s">"descripcion"</span>: desc}) | tweet_chain
+<span class="c"># ... sigue en el cuadro de al lado →</span></pre>
+    </div>
+    <div class="card" style="padding:1vh .8vw"><span class="tag">Parte 2 de 2 · unión con lambda y batch</span>
+<pre><span class="c"># ← viene del cuadro anterior</span>
+<span class="c"># Unión: el paso 1 entrega un str, pero el paso 2</span>
+<span class="c"># espera un dict {"descripcion": ...}.</span>
+<span class="c"># La lambda hace de puente: toma el str (desc)</span>
+<span class="c"># y lo envuelve en el dict.</span>
+full_chain = (descripcion_chain
+    | (<span class="k">lambda</span> desc: {<span class="s">"descripcion"</span>: desc})
+    | tweet_chain)
 
-productos = [{<span class="s">"producto"</span>: <span class="s">"termo de acero 1L"</span>}, {<span class="s">"producto"</span>: <span class="s">"mochila antirrobo"</span>}]
+<span class="c"># Entradas: lista de dicts, con la clave</span>
+<span class="c"># "producto" que espera el paso 1</span>
+productos = [{<span class="s">"producto"</span>: <span class="s">"termo de acero 1L"</span>},
+             {<span class="s">"producto"</span>: <span class="s">"mochila antirrobo"</span>}]
+
+<span class="c"># batch: ejecuta full_chain completa (los 2 pasos)</span>
+<span class="c"># una vez por cada producto, en paralelo</span>
 tweets = full_chain.<span class="f">batch</span>(productos)
+
+<span class="c"># El resultado conserva el orden:</span>
+<span class="c"># tweets[i] corresponde a productos[i].</span>
+<span class="c"># zip recorre ambas listas a la vez, así</span>
+<span class="c"># emparejamos cada producto con su tweet.</span>
 <span class="k">for</span> p, t <span class="k">in</span> zip(productos, tweets):
     print(f<span class="s">"{p['producto']}: {t}"</span>)</pre>
+    </div>
+  </div>
   <ul>
     <li>La lambda convierte el <code>str</code> del paso 1 en el <code>dict</code> que espera el paso 2.</li>
     <li>2 productos × 2 pasos = <b>4 llamadas</b> al modelo.</li>
@@ -593,7 +610,7 @@ tweets = full_chain.<span class="f">batch</span>(productos)
   </ul>
 </section>
 
-<!-- 23 -->
+<!-- 19 -->
 <section class="slide">
   <h2>El contrato de datos: salidas estructuradas</h2>
   <p>Cuando un LLM responde en lenguaje natural, el formato puede cambiar de una llamada a otra. Tres riesgos típicos:</p>
@@ -605,7 +622,7 @@ tweets = full_chain.<span class="f">batch</span>(productos)
   <p class="note">La solución: definir un <b>contrato formal</b> (un esquema) que la salida del modelo está obligada a cumplir.</p>
 </section>
 
-<!-- 24 -->
+<!-- 20 -->
 <section class="slide">
   <h2>¿Por qué Pydantic?</h2>
   <p>Pydantic es la librería de validación de datos estándar en el Python moderno. Integrada con LangChain, define un esquema formal que el modelo tiene que seguir.</p>
@@ -622,7 +639,7 @@ tweets = full_chain.<span class="f">batch</span>(productos)
         <span class="w">ge=0, le=1</span>, description=<span class="s">"0 muy negativo, 1 muy positivo"</span>)</pre>
 </section>
 
-<!-- 25 -->
+<!-- 21 -->
 <section class="slide">
   <h2>El método with_structured_output</h2>
   <div class="flow">
@@ -633,17 +650,21 @@ tweets = full_chain.<span class="f">batch</span>(productos)
 <pre>llm = ChatOpenAI(model=<span class="s">"gpt-4o"</span>, temperature=0)
 structured_llm = llm.<span class="f">with_structured_output</span>(EntityExtraction)
 
+prompt = ChatPromptTemplate.from_messages([
+    (<span class="s">"system"</span>, <span class="s">"Extraé la información estructurada del texto del usuario."</span>),
+    (<span class="s">"human"</span>, <span class="s">"{input}"</span>),
+])
+
 chain = prompt | structured_llm
 result = chain.invoke({<span class="s">"input"</span>: text})
 <span class="f">print</span>(type(result))  <span class="c"># EntityExtraction, no AIMessage ni str</span></pre>
   <ul>
     <li>LangChain abstrae el parseo manual de la salida.</li>
-    <li>Por debajo usa <b>Tool Calling</b> o <b>JSON Mode</b> del proveedor (OpenAI, Anthropic...) para que el modelo "encaje" su respuesta en tu molde.</li>
     <li>La <code>description</code> de cada campo le dice al modelo qué completar.</li>
   </ul>
 </section>
 
-<!-- 26 -->
+<!-- 22 -->
 <section class="slide">
   <h2>Resiliencia: manejo de errores</h2>
   <p>Un sistema de IA en producción no solo tiene que ser correcto: tiene que ser <b>robusto</b>. Las llamadas a modelos pueden fallar por dos motivos distintos:</p>
@@ -660,7 +681,7 @@ result = chain.invoke({<span class="s">"input"</span>: text})
   <p class="note">Esta distinción (red vs. lógica) define toda la estrategia de recuperación.</p>
 </section>
 
-<!-- 27 -->
+<!-- 23 -->
 <section class="slide">
   <h2>Estrategias de recuperación</h2>
   <p>En lugar de dejar que el sistema falle y le devuelva un error al usuario:</p>
@@ -678,30 +699,7 @@ result = chain.invoke({<span class="s">"input"</span>: text})
 llm_with_fallback = resilient_llm.<span class="f">with_fallbacks</span>([gemini_structured])</pre>
 </section>
 
-<!-- 28 -->
-<section class="slide">
-  <h2>Errores comunes de arquitectura</h2>
-  <div class="grid">
-    <div class="card bad">
-      <span class="tag bad">confiar ciegamente</span>
-<pre>data = json.loads(resp.content)
-data[<span class="s">"confianza"</span>]  <span class="c"># ¿y si no existe?</span></pre>
-      <p>Nunca asumas que <code>json.loads</code> va a funcionar. Usá siempre un validador de esquema.</p>
-    </div>
-    <div class="card ok">
-      <span class="tag ok">validar</span>
-<pre>structured_llm = llm.<span class="f">with_structured_output</span>(
-    EntityExtraction)</pre>
-      <p>El esquema valida sintaxis, estructura y reglas de negocio.</p>
-    </div>
-  </div>
-  <div class="card bad">
-    <span class="tag bad">reintentar errores permanentes</span>
-    <p>Si el prompt tiene un error lógico que causa rechazo, reintentar 10 veces solo desperdicia <b>plata y latencia</b>. Diferenciá errores de <b>transporte</b> (red) de errores de <b>lógica</b>.</p>
-  </div>
-</section>
-
-<!-- 29 -->
+<!-- 25 -->
 <section class="slide">
   <h2>Ejercicio 3: qué tenés que hacer</h2>
   <p><b>Objetivo:</b> que el LLM devuelva siempre un objeto con estructura fija, validado con Pydantic, y que la cadena reintente si falla la conexión.</p>
@@ -715,7 +713,7 @@ data[<span class="s">"confianza"</span>]  <span class="c"># ¿y si no existe?</s
   <p class="note">Necesitás la variable de entorno <code>OPENAI_API_KEY</code>: este ejercicio sí llama al modelo. Usá el <code>sample_text</code> que ya está en el código.</p>
 </section>
 
-<!-- 30 -->
+<!-- 26 -->
 <section class="slide">
   <h2>Ejercicio 3: salida esperada</h2>
 <pre>{
@@ -730,69 +728,104 @@ data[<span class="s">"confianza"</span>]  <span class="c"># ¿y si no existe?</s
   </ul>
 </section>
 
-<!-- 31 -->
-<section class="slide">
-  <h2>Solución (1/3): el esquema</h2>
-<pre><span class="k">class</span> <span class="f">EntityExtraction</span>(BaseModel):
+<!-- 27 -->
+<section class="slide scroll">
+  <h2>Solución: código completo</h2>
+  <div class="grid" style="grid-template-columns:1fr;grid-template-rows:minmax(0,1fr);align-items:stretch">
+    <div class="card" style="padding:1vh .8vw"><span class="tag">Código completo · Ejercicio 3</span>
+<pre><span class="k">import</span> asyncio
+<span class="k">from</span> typing <span class="k">import</span> List
+<span class="k">from</span> pydantic <span class="k">import</span> BaseModel, Field, ValidationError
+<span class="k">from</span> dotenv <span class="k">import</span> load_dotenv  <span class="c"># lee el .env y carga las claves</span>
+
+<span class="c"># Errores de transporte del SDK de OpenAI (los que conviene</span>
+<span class="c"># reintentar o derivar a otro modelo)</span>
+<span class="k">from</span> openai <span class="k">import</span> (APIConnectionError, APITimeoutError,
+                    RateLimitError, InternalServerError)
+<span class="k">from</span> langchain_openai <span class="k">import</span> ChatOpenAI
+<span class="k">from</span> langchain_google_genai <span class="k">import</span> ChatGoogleGenerativeAI  <span class="c"># Gemini</span>
+<span class="k">from</span> langchain_core.prompts <span class="k">import</span> ChatPromptTemplate
+
+<span class="c"># ANTES de crear los modelos: ellos buscan OPENAI_API_KEY y</span>
+<span class="c"># GOOGLE_API_KEY en el entorno al construirse</span>
+load_dotenv()
+
+<span class="c"># --- ESQUEMA ---</span>
+<span class="k">class</span> <span class="f">EntityExtraction</span>(BaseModel):
     topic: str = Field(description=<span class="s">"Tema principal del texto"</span>)
     entities: List[str] = Field(
-        description=<span class="s">"Personas, organizaciones, productos o tecnologías mencionadas"</span>)
+        description=<span class="s">"Personas, organizaciones, productos o tecnologías"</span>)
     sentiment_score: float = Field(
         <span class="w">ge=0, le=1</span>,  <span class="c"># regla de negocio: entre 0 y 1</span>
         description=<span class="s">"0 es muy negativo, 1 es muy positivo"</span>)
 
-<span class="c"># Errores "de transporte": un ValidationError NO está acá</span>
+<span class="c"># Errores "de transporte": deciden cuándo reintentar y cuándo</span>
+<span class="c"># pasar a Gemini. Un ValidationError NO está acá, así que nunca</span>
+<span class="c"># activa ni el reintento ni el fallback.</span>
 TRANSPORT_ERRORS = (APIConnectionError, APITimeoutError,
-                    RateLimitError, InternalServerError)</pre>
-  <ul>
-    <li><code>TRANSPORT_ERRORS</code> decide cuándo reintentar y cuándo pasar al respaldo.</li>
-    <li>Los imports vienen de <code>pydantic</code>, <code>openai</code>, <code>langchain_openai</code> y <code>langchain_google_genai</code>.</li>
-  </ul>
-</section>
+                    RateLimitError, InternalServerError)
 
-<!-- 32 -->
-<section class="slide">
-  <h2>Solución (2/3): reintentos y fallback</h2>
-<pre><span class="c"># max_retries=0: el único que reintenta es with_retry</span>
+<span class="c"># --- MODELO PRINCIPAL (OpenAI) ---</span>
+<span class="c"># max_retries=0: desactiva los reintentos internos del SDK</span>
+<span class="c"># (por defecto hace 2) para que el único que reintente sea</span>
+<span class="c"># with_retry y no se multipliquen los intentos</span>
 llm = ChatOpenAI(model=<span class="s">"gpt-4o"</span>, temperature=0, <span class="w">max_retries=0</span>)
+
+<span class="c"># Salida estructurada: devuelve un objeto EntityExtraction validado</span>
 structured_llm = llm.<span class="f">with_structured_output</span>(EntityExtraction)
+
+<span class="c"># Reintenta solo errores de transporte (hasta 3 intentos, con</span>
+<span class="c"># backoff). Un ValidationError es un error lógico: reintentarlo</span>
+<span class="c"># solo gasta plata y latencia.</span>
 resilient_llm = structured_llm.<span class="f">with_retry</span>(
-    retry_if_exception_type=TRANSPORT_ERRORS, stop_after_attempt=3)
+    retry_if_exception_type=TRANSPORT_ERRORS,
+    stop_after_attempt=3)
 
-<span class="c"># Respaldo: Gemini con el MISMO esquema</span>
+<span class="c"># --- MODELO DE RESPALDO (Gemini) ---</span>
+<span class="c"># Ajustá el modelo al que tengas disponible en tu cuenta</span>
 gemini = ChatGoogleGenerativeAI(model=<span class="s">"gemini-2.5-flash"</span>, temperature=0)
-gemini_structured = gemini.<span class="f">with_structured_output</span>(EntityExtraction)
-llm_with_fallback = resilient_llm.<span class="f">with_fallbacks</span>(
-    [gemini_structured], exceptions_to_handle=TRANSPORT_ERRORS)</pre>
-  <p class="note">Versión ampliada del ejercicio: además de <code>with_retry</code>, suma un <b>fallback a Gemini</b>. Hay que definir <code>GOOGLE_API_KEY</code> en el <code>.env</code>.</p>
-</section>
 
-<!-- 33 -->
-<section class="slide">
-  <h2>Solución (3/3): cadena y ejecución</h2>
-<pre>prompt = ChatPromptTemplate.from_messages([
+<span class="c"># Mismo esquema: el resultado tiene la misma forma</span>
+<span class="c"># sin importar qué modelo responda</span>
+gemini_structured = gemini.<span class="f">with_structured_output</span>(EntityExtraction)
+
+<span class="c"># Si gpt-4o sigue fallando con un error de transporte tras los</span>
+<span class="c"># 3 intentos, se llama a Gemini. exceptions_to_handle limita el</span>
+<span class="c"># fallback a esos errores: un ValidationError se propaga al except.</span>
+llm_with_fallback = resilient_llm.<span class="f">with_fallbacks</span>(
+    [gemini_structured],
+    exceptions_to_handle=TRANSPORT_ERRORS)
+
+<span class="c"># --- PROMPT Y CADENA ---</span>
+prompt = ChatPromptTemplate.from_messages([
     (<span class="s">"system"</span>, <span class="s">"Extraé la información estructurada del texto del usuario."</span>),
     (<span class="s">"human"</span>, <span class="s">"{input}"</span>),
 ])
-chain = prompt | llm_with_fallback
+chain = prompt | llm_with_fallback  <span class="c"># reintentos + fallback</span>
 
+sample_text = (
+    <span class="s">"LangGraph es una librería de LangChain para construir agentes "</span>
+    <span class="s">"con estado. Me parece muy útil, aunque la documentación "</span>
+    <span class="s">"todavía tiene huecos."</span>)
+
+<span class="c"># --- EJECUCIÓN ---</span>
 <span class="k">async def</span> <span class="f">main</span>():
     <span class="k">try</span>:
         result = <span class="k">await</span> chain.<span class="f">ainvoke</span>({<span class="s">"input"</span>: sample_text})
         <span class="f">print</span>(result.model_dump_json(indent=2))
-    <span class="k">except</span> ValidationError <span class="k">as</span> e:   <span class="c"># el modelo no respetó el esquema</span>
+    <span class="c"># El modelo respondió pero no respetó el esquema</span>
+    <span class="k">except</span> ValidationError <span class="k">as</span> e:
         <span class="f">print</span>(<span class="s">"Error de validación:"</span>, type(e).__name__)
-    <span class="k">except</span> Exception <span class="k">as</span> e:         <span class="c"># fallaron OpenAI y Gemini, API key, etc.</span>
+    <span class="c"># Fallaron OpenAI (con reintentos) Y Gemini, API key inválida, etc.</span>
+    <span class="k">except</span> Exception <span class="k">as</span> e:
         <span class="f">print</span>(<span class="s">"Fallaron todos los modelos:"</span>, type(e).__name__, <span class="s">"-"</span>, e)
 
 asyncio.run(main())</pre>
-  <ul>
-    <li>Un <code>ValidationError</code> no activa ni el reintento ni el fallback: se propaga al primer <code>except</code>.</li>
-    <li><code>load_dotenv()</code> va <b>antes</b> de crear los modelos: buscan las claves al construirse.</li>
-  </ul>
+    </div>
+  </div>
 </section>
 
-<!-- 34 -->
+<!-- 30 -->
 <section class="slide">
   <h2>Resumen</h2>
   <ul>
@@ -810,8 +843,6 @@ asyncio.run(main())</pre>
 
 </div>
 
-
-
 <script>
   const slides = [...document.querySelectorAll('.slide')];
   // Envuelve el contenido de cada slide para poder escalarlo como un bloque
@@ -824,6 +855,7 @@ asyncio.run(main())</pre>
   function fit(sl){
     const w = sl.querySelector('.fit');
     if (!w) return;
+    if (sl.classList.contains('scroll')) { w.style.zoom = 1; return; }
     const overflows = () => sl.scrollHeight > sl.clientHeight + 1 || sl.scrollWidth > sl.clientWidth + 1 ||
       [...w.querySelectorAll('pre,table')].some(e => e.scrollWidth > e.clientWidth + 1);
     let z = 1;
@@ -833,12 +865,12 @@ asyncio.run(main())</pre>
   }
   const sections = [
     {name:'Fundamentos',      from:2,  to:8},
-    {name:'Input shaping',    from:9,  to:10},
-    {name:'Paralelismo',      from:11, to:17},
-    {name:'Buenas prácticas', from:18, to:20},
-    {name:'Ejercicios',       from:21, to:22},
-    {name:'Producción',       from:23, to:28},
-    {name:'Ejercicio 3',      from:29, to:34}
+    {name:'Input shaping',    from:9,  to:9},
+    {name:'Paralelismo',      from:10, to:13},
+    {name:'Buenas prácticas', from:14, to:16},
+    {name:'Ejercicios',       from:17, to:18},
+    {name:'Producción',       from:19, to:23},
+    {name:'Ejercicio 3',      from:24, to:27}
   ];
   let i = 0;
   const bar = document.getElementById('bar'), count = document.getElementById('count');
