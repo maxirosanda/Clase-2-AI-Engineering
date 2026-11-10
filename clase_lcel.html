@@ -129,6 +129,30 @@ html,body{transition:background .3s,color .3s}
     .deck{position:static;background:#fff}
     .slide{position:static;display:flex!important;page-break-after:always;height:100vh;animation:none}
   }
+
+  /* ===== Ajustes de layout: header compacto, sin scroll en código ===== */
+  .announce{padding:.55vh 2vw;font-size:clamp(.68rem,1vw,.9rem);gap:1vw}
+  .announce .pill-dark{padding:.2em .8em}
+  .top{padding:1vh 2.5vw;gap:1.2vw}
+  .logo{min-width:0}
+  .logo img{height:1.8rem}
+  .wordmark{font-size:1.4rem}
+  nav{flex:1;min-width:0;flex-wrap:nowrap;gap:.1vw}
+  nav button{white-space:nowrap;font-size:clamp(.7rem,.95vw,.9rem);padding:.45em .7em}
+  nav button::after{display:none}
+  .actions{gap:.5vw;flex:none}
+  .btn-orange{white-space:nowrap;padding:.6em 1.2em;font-size:clamp(.78rem,1vw,.95rem)}
+  .round{width:2.4rem;height:2.4rem}
+  .counter{height:2.4rem;white-space:nowrap;padding:0 .9em;font-size:.85rem}
+
+  .slide{padding:2.2vh 6vw 2.8vh;gap:1.5vh;overflow:hidden}
+  .fit{display:flex;flex-direction:column;gap:inherit;align-items:inherit;justify-content:center;transform-origin:top left}
+  p,li{line-height:1.45}
+  pre{overflow:hidden;padding:1.5vh 1.5vw;font-size:clamp(.7rem,1.2vw,1rem);line-height:1.5}
+  .card{padding:1.8vh 1.4vw}
+
+  @media (max-width:1100px){nav{display:none}}
+  @media print{.fit{zoom:1!important;width:100%!important}}
 </style>
 <script>try{var t=localStorage.getItem('lcel-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 </head>
@@ -523,8 +547,10 @@ r.upper()  <span class="c"># "HOLA"</span></pre>
 <!-- 21 -->
 <section class="slide">
   <h2>Ejercicio 1: reseñas (paralelo → síntesis)</h2>
-<pre>sentiment_chain = ChatPromptTemplate.from_template(<span class="s">"...sentimiento...: {review}"</span>) | model | parser
-topic_chain     = ChatPromptTemplate.from_template(<span class="s">"...tema principal...: {review}"</span>)   | model | parser
+<pre>sentiment_chain = (
+    ChatPromptTemplate.from_template(<span class="s">"...sentimiento...: {review}"</span>) | model | parser)
+topic_chain = (
+    ChatPromptTemplate.from_template(<span class="s">"...tema principal...: {review}"</span>) | model | parser)
 
 analysis = RunnableParallel(sentiment=sentiment_chain, topic=topic_chain)
 
@@ -533,7 +559,8 @@ ticket_prompt = ChatPromptTemplate.from_template(
 
 full_chain = analysis | ticket_prompt | model | parser
 
-tickets = full_chain.batch([{<span class="s">"review"</span>: r} <span class="k">for</span> r <span class="k">in</span> reviews], config={<span class="s">"max_concurrency"</span>: 5})</pre>
+tickets = full_chain.<span class="f">batch</span>(
+    [{<span class="s">"review"</span>: r} <span class="k">for</span> r <span class="k">in</span> reviews], config={<span class="s">"max_concurrency"</span>: 5})</pre>
   <div class="flow">
     <div class="node">review</div><span class="arrow">→</span>
     <div class="node m">sentimiento ∥ tema</div><span class="arrow">→</span>
@@ -546,12 +573,17 @@ tickets = full_chain.batch([{<span class="s">"review"</span>: r} <span class="k"
 <!-- 22 -->
 <section class="slide">
   <h2>Ejercicio 2: cadena secuencial con lambda</h2>
-<pre>descripcion_chain = ChatPromptTemplate.from_template(<span class="s">"Descripción de 2 oraciones para: {producto}"</span>) | model | parser
-tweet_chain       = ChatPromptTemplate.from_template(<span class="s">"Resumí en un tweet con 1 emoji: {descripcion}"</span>) | model | parser
+<pre>descripcion_chain = (
+    ChatPromptTemplate.from_template(<span class="s">"Descripción de 2 oraciones para: {producto}"</span>)
+    | model | parser)
+tweet_chain = (
+    ChatPromptTemplate.from_template(<span class="s">"Resumí en un tweet con 1 emoji: {descripcion}"</span>)
+    | model | parser)
 
 full_chain = descripcion_chain | (<span class="k">lambda</span> desc: {<span class="s">"descripcion"</span>: desc}) | tweet_chain
 
-tweets = full_chain.batch([{<span class="s">"producto"</span>: <span class="s">"termo de acero 1L"</span>}, {<span class="s">"producto"</span>: <span class="s">"mochila antirrobo"</span>}])
+productos = [{<span class="s">"producto"</span>: <span class="s">"termo de acero 1L"</span>}, {<span class="s">"producto"</span>: <span class="s">"mochila antirrobo"</span>}]
+tweets = full_chain.<span class="f">batch</span>(productos)
 <span class="k">for</span> p, t <span class="k">in</span> zip(productos, tweets):
     print(f<span class="s">"{p['producto']}: {t}"</span>)</pre>
   <ul>
@@ -585,8 +617,9 @@ tweets = full_chain.batch([{<span class="s">"producto"</span>: <span class="s">"
   </table>
 <pre><span class="k">class</span> <span class="f">EntityExtraction</span>(BaseModel):
     topic: str = Field(description=<span class="s">"Tema principal del texto"</span>)
-    entities: List[str] = Field(description=<span class="s">"Personas, organizaciones, productos o tecnologías"</span>)
-    sentiment_score: float = Field(<span class="w">ge=0, le=1</span>, description=<span class="s">"0 muy negativo, 1 muy positivo"</span>)</pre>
+    entities: List[str] = Field(description=<span class="s">"Personas, orgs, productos, tecnologías"</span>)
+    sentiment_score: float = Field(
+        <span class="w">ge=0, le=1</span>, description=<span class="s">"0 muy negativo, 1 muy positivo"</span>)</pre>
 </section>
 
 <!-- 25 -->
@@ -699,16 +732,28 @@ data[<span class="s">"confianza"</span>]  <span class="c"># ¿y si no existe?</s
 
 <!-- 31 -->
 <section class="slide">
-  <h2>Solución (1/2): esquema y modelos</h2>
+  <h2>Solución (1/3): el esquema</h2>
 <pre><span class="k">class</span> <span class="f">EntityExtraction</span>(BaseModel):
     topic: str = Field(description=<span class="s">"Tema principal del texto"</span>)
-    entities: List[str] = Field(description=<span class="s">"Personas, organizaciones, productos o tecnologías mencionadas"</span>)
-    sentiment_score: float = Field(ge=0, le=1, description=<span class="s">"0 es muy negativo, 1 es muy positivo"</span>)
+    entities: List[str] = Field(
+        description=<span class="s">"Personas, organizaciones, productos o tecnologías mencionadas"</span>)
+    sentiment_score: float = Field(
+        <span class="w">ge=0, le=1</span>,  <span class="c"># regla de negocio: entre 0 y 1</span>
+        description=<span class="s">"0 es muy negativo, 1 es muy positivo"</span>)
 
-<span class="c"># Solo errores "de transporte": un ValidationError NO está acá</span>
-TRANSPORT_ERRORS = (APIConnectionError, APITimeoutError, RateLimitError, InternalServerError)
+<span class="c"># Errores "de transporte": un ValidationError NO está acá</span>
+TRANSPORT_ERRORS = (APIConnectionError, APITimeoutError,
+                    RateLimitError, InternalServerError)</pre>
+  <ul>
+    <li><code>TRANSPORT_ERRORS</code> decide cuándo reintentar y cuándo pasar al respaldo.</li>
+    <li>Los imports vienen de <code>pydantic</code>, <code>openai</code>, <code>langchain_openai</code> y <code>langchain_google_genai</code>.</li>
+  </ul>
+</section>
 
-<span class="c"># max_retries=0: el único que reintenta es with_retry (si no, se multiplican los intentos)</span>
+<!-- 32 -->
+<section class="slide">
+  <h2>Solución (2/3): reintentos y fallback</h2>
+<pre><span class="c"># max_retries=0: el único que reintenta es with_retry</span>
 llm = ChatOpenAI(model=<span class="s">"gpt-4o"</span>, temperature=0, <span class="w">max_retries=0</span>)
 structured_llm = llm.<span class="f">with_structured_output</span>(EntityExtraction)
 resilient_llm = structured_llm.<span class="f">with_retry</span>(
@@ -722,9 +767,9 @@ llm_with_fallback = resilient_llm.<span class="f">with_fallbacks</span>(
   <p class="note">Versión ampliada del ejercicio: además de <code>with_retry</code>, suma un <b>fallback a Gemini</b>. Hay que definir <code>GOOGLE_API_KEY</code> en el <code>.env</code>.</p>
 </section>
 
-<!-- 32 -->
+<!-- 33 -->
 <section class="slide">
-  <h2>Solución (2/2): cadena y ejecución</h2>
+  <h2>Solución (3/3): cadena y ejecución</h2>
 <pre>prompt = ChatPromptTemplate.from_messages([
     (<span class="s">"system"</span>, <span class="s">"Extraé la información estructurada del texto del usuario."</span>),
     (<span class="s">"human"</span>, <span class="s">"{input}"</span>),
@@ -735,21 +780,19 @@ chain = prompt | llm_with_fallback
     <span class="k">try</span>:
         result = <span class="k">await</span> chain.<span class="f">ainvoke</span>({<span class="s">"input"</span>: sample_text})
         <span class="f">print</span>(result.model_dump_json(indent=2))
-
-    <span class="k">except</span> ValidationError <span class="k">as</span> e:       <span class="c"># el modelo no respetó el esquema</span>
+    <span class="k">except</span> ValidationError <span class="k">as</span> e:   <span class="c"># el modelo no respetó el esquema</span>
         <span class="f">print</span>(<span class="s">"Error de validación:"</span>, type(e).__name__)
-
-    <span class="k">except</span> Exception <span class="k">as</span> e:             <span class="c"># fallaron OpenAI Y Gemini, API key inválida, etc.</span>
-        <span class="f">print</span>(<span class="s">"Fallaron todos los modelos u otro error:"</span>, type(e).__name__, <span class="s">"-"</span>, e)
+    <span class="k">except</span> Exception <span class="k">as</span> e:         <span class="c"># fallaron OpenAI y Gemini, API key, etc.</span>
+        <span class="f">print</span>(<span class="s">"Fallaron todos los modelos:"</span>, type(e).__name__, <span class="s">"-"</span>, e)
 
 asyncio.run(main())</pre>
   <ul>
     <li>Un <code>ValidationError</code> no activa ni el reintento ni el fallback: se propaga al primer <code>except</code>.</li>
-    <li><code>load_dotenv()</code> va <b>antes</b> de crear los modelos: ellos buscan las claves al construirse.</li>
+    <li><code>load_dotenv()</code> va <b>antes</b> de crear los modelos: buscan las claves al construirse.</li>
   </ul>
 </section>
 
-<!-- 33 -->
+<!-- 34 -->
 <section class="slide">
   <h2>Resumen</h2>
   <ul>
@@ -771,15 +814,31 @@ asyncio.run(main())</pre>
 
 <script>
   const slides = [...document.querySelectorAll('.slide')];
+  // Envuelve el contenido de cada slide para poder escalarlo como un bloque
+  slides.forEach(sl => {
+    const w = document.createElement('div');
+    w.className = 'fit';
+    while (sl.firstChild) w.appendChild(sl.firstChild);
+    sl.appendChild(w);
+  });
+  function fit(sl){
+    const w = sl.querySelector('.fit');
+    if (!w) return;
+    const overflows = () => sl.scrollHeight > sl.clientHeight + 1 || sl.scrollWidth > sl.clientWidth + 1 ||
+      [...w.querySelectorAll('pre,table')].some(e => e.scrollWidth > e.clientWidth + 1);
+    let z = 1;
+    const apply = () => { w.style.zoom = z; };
+    apply();
+    while (overflows() && z > 0.4) { z = Math.round((z - 0.03) * 100) / 100; apply(); }
+  }
   const sections = [
     {name:'Fundamentos',      from:2,  to:8},
     {name:'Input shaping',    from:9,  to:10},
     {name:'Paralelismo',      from:11, to:17},
     {name:'Buenas prácticas', from:18, to:20},
     {name:'Ejercicios',       from:21, to:22},
-    {name:'Estructuradas', from:23, to:25},
-    {name:'Resiliencia',      from:26, to:28},
-    {name:'Ejercicio 3 y cierre', from:29, to:33}
+    {name:'Producción',       from:23, to:28},
+    {name:'Ejercicio 3',      from:29, to:34}
   ];
   let i = 0;
   const bar = document.getElementById('bar'), count = document.getElementById('count');
@@ -793,6 +852,7 @@ asyncio.run(main())</pre>
   function show(n){
     i = Math.max(0, Math.min(slides.length - 1, n));
     slides.forEach((s, k) => s.classList.toggle('active', k === i));
+    fit(slides[i]);
     bar.style.width = ((i + 1) / slides.length * 100) + '%';
     count.textContent = (i + 1) + ' / ' + slides.length;
     [...nav.children].forEach((b, k) => b.classList.toggle('active', i + 1 >= sections[k].from && i + 1 <= sections[k].to));
@@ -818,6 +878,8 @@ asyncio.run(main())</pre>
     }
   });
   show((parseInt(location.hash.slice(1)) || 1) - 1);
+  window.addEventListener('resize', () => fit(slides[i]));
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fit(slides[i]));
 </script>
 </body>
 </html>
