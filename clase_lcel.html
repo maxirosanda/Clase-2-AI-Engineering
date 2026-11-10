@@ -484,10 +484,10 @@ r.upper()  <span class="c"># "HOLA"</span></pre>
 </section>
 
 <!-- 17 -->
-<section class="slide">
+<section class="slide scroll">
   <h2>Ejercicio 1: reseñas (paralelo → síntesis)</h2>
-  <div class="grid" style="gap:1.2vw;align-items:stretch">
-    <div class="card" style="padding:1vh .8vw"><span class="tag">Parte 1 de 2 · cadenas y paralelo</span>
+  <div class="grid" style="grid-template-columns:1fr;grid-template-rows:minmax(0,1fr);align-items:stretch">
+    <div class="card" style="padding:1vh .8vw"><span class="tag">Código completo · Ejercicio 1</span>
 <pre><span class="k">from</span> langchain_openai <span class="k">import</span> ChatOpenAI
 <span class="k">from</span> langchain_core.prompts <span class="k">import</span> ChatPromptTemplate
 <span class="k">from</span> langchain_core.output_parsers <span class="k">import</span> StrOutputParser
@@ -513,10 +513,6 @@ topic_chain = (
 <span class="c"># Devuelve un dict: {"sentiment": ..., "topic": ...}</span>
 analysis = RunnableParallel(sentiment=sentiment_chain, topic=topic_chain)
 
-<span class="c"># ... sigue en el cuadro de al lado →</span></pre>
-    </div>
-    <div class="card" style="padding:1vh .8vw"><span class="tag">Parte 2 de 2 · síntesis y batch</span>
-<pre><span class="c"># ← viene del cuadro anterior</span>
 <span class="c"># Prompt final: {sentiment} y {topic} coinciden</span>
 <span class="c"># con las claves del dict anterior</span>
 ticket_prompt = ChatPromptTemplate.from_template(
@@ -551,10 +547,10 @@ tickets = full_chain.<span class="f">batch</span>(inputs, config={<span class="s
 </section>
 
 <!-- 18 -->
-<section class="slide">
+<section class="slide scroll">
   <h2>Ejercicio 2: cadena secuencial con lambda</h2>
-  <div class="grid" style="gap:1.2vw;align-items:stretch">
-    <div class="card" style="padding:1vh .8vw"><span class="tag">Parte 1 de 2 · los dos pasos</span>
+  <div class="grid" style="grid-template-columns:1fr;grid-template-rows:minmax(0,1fr);align-items:stretch">
+    <div class="card" style="padding:1vh .8vw"><span class="tag">Código completo · Ejercicio 2</span>
 <pre><span class="k">from</span> langchain_openai <span class="k">import</span> ChatOpenAI
 <span class="k">from</span> langchain_core.prompts <span class="k">import</span> ChatPromptTemplate
 <span class="k">from</span> langchain_core.output_parsers <span class="k">import</span> StrOutputParser
@@ -574,10 +570,6 @@ tweet_chain = (
         <span class="s">"Resumí en un tweet con 1 emoji: {descripcion}"</span>)
     | model | parser)
 
-<span class="c"># ... sigue en el cuadro de al lado →</span></pre>
-    </div>
-    <div class="card" style="padding:1vh .8vw"><span class="tag">Parte 2 de 2 · unión con lambda y batch</span>
-<pre><span class="c"># ← viene del cuadro anterior</span>
 <span class="c"># Unión: el paso 1 entrega un str, pero el paso 2</span>
 <span class="c"># espera un dict {"descripcion": ...}.</span>
 <span class="c"># La lambda hace de puente: toma el str (desc)</span>
@@ -841,6 +833,44 @@ asyncio.run(main())</pre>
   <p class="sub">¿Preguntas?</p>
 </section>
 
+<!-- 28 -->
+<section class="slide">
+  <h2>Entrega de la semana: pipeline de extracción</h2>
+  <div class="grid" style="gap:1.4vw;align-items:stretch">
+    <div class="card">
+      <h3>Qué tenés que hacer</h3>
+      <ul>
+        <li>Creá <code>schemas.py</code> con la estructura de salida usando <b>Pydantic</b>.</li>
+        <li>En <code>chain.py</code>, configurá <code>ChatOpenAI</code> o <code>ChatAnthropic</code> (reutilizando lo del Módulo 1).</li>
+        <li>Creá un <code>ChatPromptTemplate</code> que instruya al modelo a extraer <b>información técnica</b> de un texto.</li>
+        <li>Construí la cadena: <code>prompt | model.with_structured_output(Schema)</code></li>
+        <li>Implementá una función async <code>process_text(text: str)</code> que use <code>.ainvoke()</code>.</li>
+        <li>Incluí <b>logs</b> para observar la validación y los reintentos.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Ejemplo de salida esperada</h3>
+      <p style="font-size:clamp(.8rem,1.3vw,1.05rem)">Dado un texto (ej. un log de error o una descripción de arquitectura), el pipeline devuelve un objeto validado:</p>
+<pre>{
+  <span class="s">"tecnologias"</span>: [<span class="s">"FastAPI"</span>, <span class="s">"Redis"</span>, <span class="s">"PostgreSQL"</span>],
+  <span class="s">"nivel_de_criticidad"</span>: <span class="s">"alta"</span>,
+  <span class="s">"resumen_tecnico"</span>: <span class="s">"API con caché en Redis y persistencia
+    en PostgreSQL; cuello de botella en conexiones
+    concurrentes."</span>
+}</pre>
+      <h3 style="margin-top:1.2vh">Checklist de entrega</h3>
+      <ul>
+        <li>Repo de GitHub con <code>schemas.py</code> y <code>chain.py</code></li>
+        <li>Cadena LCEL con <code>with_structured_output</code></li>
+        <li><code>.with_retry()</code> ante JSON mal formado o incompleto</li>
+        <li><code>process_text()</code> async con <code>.ainvoke()</code> y logs</li>
+        <li>Mini-script de prueba que ejecute un ejemplo</li>
+      </ul>
+    </div>
+  </div>
+  <p class="note"><b>Qué entregar:</b> repositorio de GitHub con el modelo Pydantic, el prompt template y la cadena LCEL con lógica de reintentos, más un mini-script de prueba asíncrono.</p>
+</section>
+
 </div>
 
 <script>
@@ -870,7 +900,8 @@ asyncio.run(main())</pre>
     {name:'Buenas prácticas', from:14, to:16},
     {name:'Ejercicios',       from:17, to:18},
     {name:'Producción',       from:19, to:23},
-    {name:'Ejercicio 3',      from:24, to:27}
+    {name:'Ejercicio 3',      from:24, to:27},
+    {name:'Entrega',          from:28, to:28}
   ];
   let i = 0;
   const bar = document.getElementById('bar'), count = document.getElementById('count');
