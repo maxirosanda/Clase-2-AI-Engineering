@@ -1,83 +1,53 @@
-"""
-Ejercicio 1: reseñas (paralelo -> síntesis)
-
-Por cada reseña:
-  1. En paralelo: se analiza el sentimiento y se extrae el tema principal.
-  2. Con ambos resultados se escribe una línea de ticket de soporte.
-
-Son 3 llamadas al modelo por reseña. Se procesan varias reseñas a la vez con batch.
-
-Requisitos:
-    pip install langchain-openai python-dotenv
-    OPENAI_API_KEY en el archivo .env
-"""
-
-# (dotenv): lee el archivo .env y carga sus líneas como variables de entorno
 from dotenv import load_dotenv
+load_dotenv()
 
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableParallel
 
-# Tiene que ir ANTES de crear el modelo: busca OPENAI_API_KEY en el entorno al construirse.
-load_dotenv()
+model  = ChatOpenAI(model="gpt-4o")
+parser = StrOutputParser()  # convierte la respuesta en str
 
-# --- COMPONENTES BASE ------------------------------------------------------
-model = ChatOpenAI(model="gpt-4o", temperature=0)
-parser = StrOutputParser()
+# Datos de entrada: una lista de reseñas (str)
+reviews = ["Llegó rápido y funciona perfecto",
+           "Se rompió a la semana, pésima calidad",
+           "El envío tardó, pero el producto está bien"]
 
-# --- DOS CADENAS QUE CORREN EN PARALELO ------------------------------------
+# Cadena 1: clasifica el sentimiento de una reseña
 sentiment_chain = (
-    ChatPromptTemplate.from_template(
-        "Analizá el sentimiento de la siguiente reseña. "
-        "Respondé con una sola palabra: positivo, negativo o neutro.\n\nReseña: {review}"
-    )
-    | model
-    | parser
-)
-
+    ChatPromptTemplate.from_template("...sentimiento...: {review}") | model | parser)
+# Cadena 2: extrae el tema principal de la misma reseña
 topic_chain = (
-    ChatPromptTemplate.from_template(
-        "Indicá cuál es el tema principal de la siguiente reseña "
-        "en pocas palabras (máximo 5).\n\nReseña: {review}"
-    )
-    | model
-    | parser
-)
+    ChatPromptTemplate.from_template("...tema principal...: {review}") | model | parser)
 
-# RunnableParallel ejecuta ambas cadenas al mismo tiempo con la misma entrada
-# y devuelve un dict: {"sentiment": ..., "topic": ...}
+# Paso paralelo: ambas cadenas reciben la MISMA
+# reseña y corren a la vez.
+# Devuelve un dict: {"sentiment": ..., "topic": ...}
 analysis = RunnableParallel(sentiment=sentiment_chain, topic=topic_chain)
 
-# --- SÍNTESIS --------------------------------------------------------------
-# Las claves del dict que sale de `analysis` (sentiment, topic) deben coincidir
-# con las variables de este prompt.
+# Prompt final: {sentiment} y {topic} coinciden
+# con las claves del dict anterior
 ticket_prompt = ChatPromptTemplate.from_template(
-    "Sentimiento: {sentiment}\n"
-    "Tema: {topic}\n"
-    "Escribí una línea de ticket de soporte para el equipo, clara y accionable."
-)
+    "Sentimiento: {sentiment}\nTema: {topic}\nEscribí una línea de ticket...")
 
+# Cadena completa: reseña → (sentimiento ∥ tema)
+# → prompt → modelo → texto
 full_chain = analysis | ticket_prompt | model | parser
 
-# --- EJECUCIÓN -------------------------------------------------------------
-reviews = [
-    "El envío llegó tres días tarde y la caja estaba rota, muy decepcionante.",
-    "Excelente atención al cliente, resolvieron mi consulta en minutos.",
-    "La app se cierra sola cada vez que intento pagar con tarjeta.",
-    "El producto es correcto, hace lo que dice, nada más.",
-]
+# batch recibe una LISTA de entradas y ejecuta
+# full_chain una vez por cada una, en paralelo.
+# Cada entrada es un dict con la clave "review"
+# (la variable que esperan las cadenas 1 y 2).
+inputs = [{"review": r} for r in reviews]
 
-if __name__ == "__main__":
-    # batch recibe una lista de inputs y devuelve una lista de resultados EN EL MISMO ORDEN.
-    # max_concurrency limita cuántas cadenas corren a la vez (evita rate limits).
-    tickets = full_chain.batch(
-        [{"review": r} for r in reviews],
-        config={"max_concurrency": 5},
-    )
+# max_concurrency=5: máximo 5 cadenas a la vez
+# (evita rate limits de la API)
+tickets = full_chain.batch(inputs, config={"max_concurrency": 5})
 
-    for review, ticket in zip(reviews, tickets):
-        print(f"Reseña: {review}")
-        print(f"Ticket: {ticket}")
-        print("-" * 60)
+# El resultado conserva el orden: tickets[i] corresponde a reviews[i]
+for i, (r, t) in enumerate(zip(reviews, tickets), start=1):
+    print(f"Reseña {i}")
+    print(f"  Texto:  {r}")
+    print(f"  Ticket: {t}")
+    print("-" * 60)
